@@ -1,0 +1,3 @@
+[submodule "vbh"]
+	path = vbh
+	url = https://github.com/intel/vbh.git
