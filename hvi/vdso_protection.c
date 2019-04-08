@@ -182,7 +182,7 @@ static int _hvi_hook_vdso(void)
 
     printk(KERN_ERR "will hook  %llx\n", g_vdso_physical_address);
 
-    status = hvi_set_ept_page_protection(g_vdso_physical_address, 1, 0, 1, 0);
+    status = hvi_set_ept_page_protection(g_vdso_physical_address, 1, 0, 1);
     if (status)
     {
         printk(KERN_ERR "[ERROR] hvi_set_ept_page_protection failed with status: %x\n", status);
@@ -194,7 +194,7 @@ static int _hvi_hook_vdso(void)
     }
 
 
-    status = hvi_set_ept_page_protection(g_vdso_physical_address + PAGE_SIZE, 1, 0, 1, 0);
+    status = hvi_set_ept_page_protection(g_vdso_physical_address + PAGE_SIZE, 1, 0, 1);
     if (status)
     {
         printk(KERN_ERR "[ERROR] hvi_set_ept_page_protection failed with status: %x\n", status);
@@ -216,7 +216,7 @@ int disable_vdso_protection(void)
     if (0 != g_vdso_physical_address)
     {
         printk(KERN_ERR "[INFO] Will unhook  %llx\n", g_vdso_physical_address);
-        status = hvi_set_ept_page_protection(g_vdso_physical_address, 1, 1, 1, 0);
+        status = hvi_set_ept_page_protection(g_vdso_physical_address, 1, 1, 1);
         if (status)
         {
             printk(KERN_ERR "[ERROR] hvi_set_ept_page_protection failed with status: %x\n", status);
@@ -227,7 +227,7 @@ int disable_vdso_protection(void)
             printk(KERN_ERR "[INFO] Sucessfully unhooked first vdso page\n");
         }
 
-        status = hvi_set_ept_page_protection(g_vdso_physical_address + PAGE_SIZE, 1, 1, 1, 1);
+        status = hvi_set_ept_page_protection(g_vdso_physical_address + PAGE_SIZE, 1, 1, 1);
         if (status)
         {
             printk(KERN_ERR "[ERROR] hvi_set_ept_page_protection failed with status: %x\n", status);

@@ -85,20 +85,20 @@ int handle_vmcall(hv_event_e type, unsigned char* data, int size, int *allow)
 
 int handle_ept_violation(hv_event_e type, unsigned char* data, int size, int *allow)
 {
-    struct hvi_event_page_fault *ept_violation_event;
+    struct hvi_event_ept_violation *ept_violation_event;
     if (type != ept_violation)
     {
         printk(KERN_ERR "[ERROR] Invalid event type sent to ept_violation handler: %d\n", type);
         return 0;
     }
 
-    if (size < sizeof(struct hvi_event_page_fault))
+    if (size < sizeof(struct hvi_event_ept_violation))
     {
         printk(KERN_ERR "[ERROR] Invalid data size.\n");
         return 0;
     }
 
-    ept_violation_event = (struct hvi_event_page_fault*)data;
+    ept_violation_event = (struct hvi_event_ept_violation*)data;
 
     printk(KERN_ERR "ept violation. GPA = 0x%llx  GLA = 0x%llx.\n", ept_violation_event->gla, ept_violation_event->gpa);
     if (ept_violation_event->gpa >= g_vdso_physical_address && ept_violation_event->gpa < g_vdso_physical_address + 2 * PAGE_SIZE)
