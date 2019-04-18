@@ -1,8 +1,10 @@
 obj-y := vbh/sources/ hvi/
 
+KERNEL ?= /lib/modules/$(shell uname -r)/build
+
 all:
-	make -C /lib/modules/$(shell uname -r)/build M=$(PWD)
+	make -C $(KERNEL) M=$(PWD)
 clean:
-	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
+	make -C $(KERNEL) M=$(PWD) clean
 
 .PHONY: all clean
