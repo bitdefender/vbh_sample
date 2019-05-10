@@ -2,6 +2,9 @@
 #include <linux/printk.h>
 #include <asm/processor-flags.h>
 #include <linux/sched.h>
+#include <linux/kprobes.h>
+#include <asm/uaccess.h>
+#include <linux/slab.h>
 
 #include "hypervisor_introspection.h"
 #include "vmx_common.h"
@@ -14,10 +17,68 @@
 extern unsigned long long g_vdso_physical_address;
 int enable_vdso_protection(void);
 int disable_vdso_protection(void);
+static int dfo_entry_handler(struct kretprobe_instance *ri, struct pt_regs *regs);
+static int dfo_ret_handler(struct kretprobe_instance *ri, struct pt_regs *regs);
 
 void asm_make_vmcall(unsigned int hypercall_id, void *params);
 int hvi_loaded = 0;
 int should_unload = 0;
+
+static struct kretprobe dfo_kretprobe = {
+    .handler        = dfo_ret_handler,
+    .entry_handler  = dfo_entry_handler,
+    .kp.symbol_name = "do_filp_open",
+};
+
+struct open_flags_c {
+    int open_flag;
+    umode_t mode;
+    int acc_mode;
+    int intent;
+    int lookup_flags;
+};
+
+static int dfo_entry_handler(struct kretprobe_instance *ri, struct pt_regs *regs)
+{
+    struct filename *filename = (struct filename *)regs->si;
+    struct open_flags_c *op = (struct open_flags_c *)regs->dx;
+
+    // we remove O_TRUNC flag for all files with
+    // proc/self/fd in name
+    if (strstr(filename->name, "/proc/self/fd"))
+    {
+        op->open_flag &= ~O_TRUNC;
+        return 0;
+    }
+
+    return !0;
+}
+
+static int dfo_ret_handler(struct kretprobe_instance *ri, struct pt_regs *regs)
+{
+    struct file *retval = (struct file *)regs->ax;
+
+    if (likely(!IS_ERR(retval)))
+    {
+        if (likely(NULL != retval->f_path.dentry->d_name.name))
+        {
+            // if the opened file is docker-runc
+            // we make a vmcall with the opening flags
+            if (unlikely(!strcmp(retval->f_path.dentry->d_name.name, "docker-runc")))
+            {
+                int flags = (u64)retval->f_flags;
+                asm_make_vmcall(DFO_HYPERCALL, (void *)&flags);
+                if (flags == -EACCES)
+                {
+                    printk(KERN_ERR "There was an attempt to overwrite docker-runc\n");
+                    regs->ax = -EACCES;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
 
 int loader(void);
 int unloader(void);
@@ -72,6 +133,19 @@ int handle_vmcall(hv_event_e type, unsigned char* data, int size, int *allow)
         printk(KERN_ERR "[INFO] Entered vmx-root. Will initialize the rest of hvi.\n");
         return loader();
     }
+
+    // for CVE-2019-5736
+    if (NULL != data)
+    {
+        // deny access if the write flag is set
+        int *params = (int *)data;
+        if ((*params & O_WRONLY))
+        {
+            *params = -EACCES;
+        }
+        return 0;
+    }
+
     if (should_unload)
     {
         printk(KERN_ERR "[INFO] Entered vmx-root. Uninitializing...\n");
@@ -185,6 +259,21 @@ int disable_cr4_exits(void)
     return 0;
 }
 
+int register_do_filp_open_kretprobe(void)
+{
+    int status;
+
+    // register a kprobe on do_filp_open so we could
+    // filter file access
+    status = register_kretprobe(&dfo_kretprobe);
+    if (status < 0)
+    {
+        printk(KERN_INFO "register_kretprobe failed, returned %d\n",
+               status);
+        return status;
+    }
+    return 0;
+}
 
 int loader(void)
 {
@@ -202,7 +291,7 @@ int loader(void)
         goto _done_unregister_cr4_callback;
     }
 
-    if (hvi_request_vcpu_pause())
+    if (hvi_request_vcpu_pause(0))
     {
         goto _done_unregister_ept_violation_callback;
     }
@@ -244,7 +333,7 @@ _done_unregister_cr4_callback:
 
 int unloader(void)
 {
-    hvi_request_vcpu_pause();
+    hvi_request_vcpu_pause(0);
 
     disable_cr4_exits();
     disable_vdso_protection(); // We do this here because EPT paging structures are not available in vmx non-root.
@@ -271,6 +360,13 @@ static int __init hvi_init(void)
     printk(KERN_ERR "[INFO] VMCALL callback registered. Will now try to enter vmx-root.\n");
 
     asm_make_vmcall(KVI_LOAD_INTROSPECTION_HYPERCALL, NULL);
+
+    if (register_do_filp_open_kretprobe())
+    {
+        printk(KERN_ERR "[ERROR] Failed to register dfo kretprobe.\n");
+    }
+
+    printk(KERN_ERR "[INFO] kretprobe registered.\n");
     return 0;
 }
 
@@ -282,6 +378,7 @@ static void __exit hvi_uninit(void)
     should_unload = 1;
     asm_make_vmcall(KVI_LOAD_INTROSPECTION_HYPERCALL, NULL);
 
+    unregister_kretprobe(&dfo_kretprobe);
     hvi_unregister_event_callback(vmcall);
     hvi_unregister_event_callback(cr_write);
     hvi_unregister_event_callback(ept_violation);
@@ -294,4 +391,5 @@ module_init(hvi_init);
 module_exit(hvi_uninit);
 MODULE_LICENSE("GPL");
 MODULE_VERSION("0.1");
-MODULE_AUTHOR("Bogdan-Viorel BOSINTA <bbosinta@bitdefender.com>");
+MODULE_AUTHOR("Bogdan-Viorel BOSINTA <bbosinta@bitdefender.com>, "
+              "Alexandru-Ciprian Cihodaru <acihodaru@bitdefender.com>");
