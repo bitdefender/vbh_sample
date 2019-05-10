@@ -16,6 +16,7 @@ extern unsigned long long g_vdso_physical_address;
 int enable_vdso_protection(void);
 int disable_vdso_protection(void);
 
+void asm_make_vmcall(unsigned int hypercall_id, void *params);
 int hvi_loaded = 0;
 int should_unload = 0;
 
@@ -270,8 +271,7 @@ static int __init hvi_init(void)
 
     printk(KERN_ERR "[INFO] VMCALL callback registered. Will now try to enter vmx-root.\n");
 
-    asm volatile("mov $" TOSTRING(KVI_LOAD_INTROSPECTION_HYPERCALL) ", %rax;"
-                 "vmcall;");
+    asm_make_vmcall(KVI_LOAD_INTROSPECTION_HYPERCALL, NULL);
     return 0;
 }
 
@@ -281,8 +281,7 @@ static void __exit hvi_uninit(void)
     printk(KERN_ERR "[INFO] Uninitializing Hvi...\n");
 
     should_unload = 1;
-    asm volatile("mov $" TOSTRING(KVI_LOAD_INTROSPECTION_HYPERCALL) ", %rax;"
-                 "vmcall;");
+    asm_make_vmcall(KVI_LOAD_INTROSPECTION_HYPERCALL, NULL);
 
     hvi_unregister_event_callback(vmcall);
     hvi_unregister_event_callback(cr_write);
