@@ -4,8 +4,7 @@
 #include <linux/sched.h>
 
 #include "hypervisor_introspection.h"
-
-#define CR4                                 4
+#include "vmx_common.h"
 
 #define STRINGIFY(x)                        #x
 #define TOSTRING(x)                         STRINGIFY(x)
@@ -42,7 +41,7 @@ int cr4_write_callback(hv_event_e type, unsigned char* data, int size, int *allo
     }
 
     cr_event = (struct hvi_event_cr*)data;
-    if (cr_event->cr != CR4)
+    if (cr_event->cr != CPU_REG_CR4)
     {
         printk(KERN_ERR "[ERROR] Invalid CR register. Expected CR4, got CR%d\n", cr_event->cr);
         return 0;
@@ -173,7 +172,7 @@ int register_ept_violation_callback(void)
 
 int enable_cr4_exits(void)
 {
-    hvi_modify_cr_write_exit(CR4, ~(unsigned int)0, 1);
+    hvi_modify_cr_write_exit(CPU_REG_CR4, ~(unsigned int)0, 1);
 
     return 0;
 }
@@ -181,7 +180,7 @@ int enable_cr4_exits(void)
 
 int disable_cr4_exits(void)
 {
-    hvi_modify_cr_write_exit(CR4, ~(unsigned int)0, 0);
+    hvi_modify_cr_write_exit(CPU_REG_CR4, ~(unsigned int)0, 0);
 
     return 0;
 }
