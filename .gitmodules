@@ -1,3 +1,4 @@
 [submodule "vbh"]
 	path = vbh
-	url = https://github.com/intel/vbh.git
+	url = https://github.com/adrianmpop/vbh
+	branch = cve-2019-5736
