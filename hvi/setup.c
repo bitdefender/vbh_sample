@@ -202,7 +202,7 @@ int loader(void)
         goto _done_unregister_cr4_callback;
     }
 
-    if (hvi_request_vcpu_pause())
+    if (hvi_request_vcpu_pause(0))
     {
         goto _done_unregister_ept_violation_callback;
     }
@@ -244,7 +244,7 @@ _done_unregister_cr4_callback:
 
 int unloader(void)
 {
-    hvi_request_vcpu_pause();
+    hvi_request_vcpu_pause(0);
 
     disable_cr4_exits();
     disable_vdso_protection(); // We do this here because EPT paging structures are not available in vmx non-root.
