@@ -8,10 +8,3 @@ $(MODULE_NAME)-y += $(MODULE_OBJECTS)
 
 EXTRA_CFLAGS += -g
 EXTRA_CFLAGS += -I$(VBH_ROOT)/sources
-
-all:
-	$(MAKE) -C /lib/modules/$(shell uname -r)/build M=$(PWD)
-
-clean:
-	$(MAKE) -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
-
