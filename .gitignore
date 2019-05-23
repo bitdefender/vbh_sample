@@ -1,0 +1,10 @@
+# Linux kernel module build files.
+*.o
+*.o.cmd
+*.ko
+*.ko.cmd
+*.mod.[co]
+.cache.mk
+.tmp_versions
+Module.symvers
+modules.order
