@@ -18,12 +18,13 @@
 extern unsigned long long g_vdso_physical_address;
 extern int enable_vdso_protection(void);
 extern int disable_vdso_protection(void);
+extern void asm_make_vmcall(unsigned int hypercall_id, void *params);
+
 static int dfo_entry_handler(struct kretprobe_instance *ri, struct pt_regs *regs);
 static int dfo_ret_handler(struct kretprobe_instance *ri, struct pt_regs *regs);
 static int loader(void);
 static int unloader(void);
 
-void asm_make_vmcall(unsigned int hypercall_id, void *params);
 static int hvi_loaded = 0;
 static int should_unload = 0;
 
