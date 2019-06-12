@@ -225,7 +225,6 @@ int enable_cr4_exits(void)
 	return 0;
 }
 
-
 int disable_cr4_exits(void)
 {
 	hvi_modify_cr_write_exit(CPU_REG_CR4, ~(unsigned int)0, 0);
