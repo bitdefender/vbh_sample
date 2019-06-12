@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 #include "hvi.h" /* Include this first for pr_fmt. */
 
 #include <linux/string.h>
@@ -45,7 +47,8 @@ struct va_translation {
 	unsigned long long page_size;
 };
 
-static int hvi_translate_va(unsigned long long va, unsigned long long cr3, struct va_translation *translation)
+static int hvi_translate_va(unsigned long long va, unsigned long long cr3,
+			    struct va_translation *translation)
 {
 	int status;
 
@@ -57,11 +60,12 @@ static int hvi_translate_va(unsigned long long va, unsigned long long cr3, struc
 	translation->virtual_address = va;
 
 	pml4i = PML4_INDEX(va);
-	pdpi  = PDP_INDEX (va);
-	pdi   = PD_INDEX  (va);
-	pti   = PT_INDEX  (va);
+	pdpi = PDP_INDEX(va);
+	pdi = PD_INDEX(va);
+	pti = PT_INDEX(va);
 
-	status = hvi_physmem_map_to_host(CLEAN_PHYS_ADDRESS64(cr3), PAGE_SIZE, 0, (void**)&pml4);
+	status = hvi_physmem_map_to_host(CLEAN_PHYS_ADDRESS64(cr3), PAGE_SIZE,
+					 0, (void **)&pml4);
 	if (status)
 		goto cleanup_and_leave;
 
@@ -70,7 +74,8 @@ static int hvi_translate_va(unsigned long long va, unsigned long long cr3, struc
 		goto cleanup_and_leave;
 	}
 
-	status = hvi_physmem_map_to_host(CLEAN_PHYS_ADDRESS64(pml4[pml4i]), PAGE_SIZE, 0, (void**)&pdp);
+	status = hvi_physmem_map_to_host(CLEAN_PHYS_ADDRESS64(pml4[pml4i]),
+					 PAGE_SIZE, 0, (void **)&pdp);
 	if (status)
 		goto cleanup_and_leave;
 
@@ -86,7 +91,8 @@ static int hvi_translate_va(unsigned long long va, unsigned long long cr3, struc
 		goto cleanup_and_leave;
 	}
 
-	status = hvi_physmem_map_to_host(CLEAN_PHYS_ADDRESS64(pdp[pdpi]), PAGE_SIZE, 0, (void**)&pd);
+	status = hvi_physmem_map_to_host(CLEAN_PHYS_ADDRESS64(pdp[pdpi]),
+					 PAGE_SIZE, 0, (void **)&pd);
 	if (status)
 		goto cleanup_and_leave;
 
@@ -102,7 +108,8 @@ static int hvi_translate_va(unsigned long long va, unsigned long long cr3, struc
 		goto cleanup_and_leave;
 	}
 
-	status = hvi_physmem_map_to_host(CLEAN_PHYS_ADDRESS64(pd[pdi]), PAGE_SIZE, 0, (void**)&pt);
+	status = hvi_physmem_map_to_host(CLEAN_PHYS_ADDRESS64(pd[pdi]),
+					 PAGE_SIZE, 0, (void **)&pt);
 	if (status)
 		goto cleanup_and_leave;
 
@@ -113,41 +120,44 @@ static int hvi_translate_va(unsigned long long va, unsigned long long cr3, struc
 cleanup_and_leave:
 
 	if (pml4 != NULL)
-		hvi_physmem_unmap((void**)&pml4);
+		hvi_physmem_unmap((void **)&pml4);
 
 	if (pdp != NULL)
-		hvi_physmem_unmap((void**)&pdp);
+		hvi_physmem_unmap((void **)&pdp);
 
 	if (pd != NULL)
-		hvi_physmem_unmap((void**)&pd);
+		hvi_physmem_unmap((void **)&pd);
 
 	if (pt != NULL)
-		hvi_physmem_unmap((void**)&pt);
+		hvi_physmem_unmap((void **)&pt);
 
 	return status;
 }
 
-static int _hvi_match_vdso(void* mapping)
+static int _hvi_match_vdso(void *mapping)
 {
 	unsigned int delta;
 	int matches;
 
-	if (*(unsigned int*)mapping != 0x464c457f) /* .ELF */
+	if (*(unsigned int *)mapping != 0x464c457f) /* .ELF */
 		return 0;
 
 	matches = 0;
 	for (delta = 0; delta < PAGE_SIZE - 0x30; delta++) {
-		if (!memcmp((char*)mapping + delta, "clock_gettime", strlen("clock_gettime"))) {
+		if (!memcmp((char *)mapping + delta, "clock_gettime",
+			    strlen("clock_gettime"))) {
 			matches++;
 			continue;
 		}
 
-		if (!memcmp((char*)mapping + delta, "gettimeofday", strlen("gettimeofday"))) {
+		if (!memcmp((char *)mapping + delta, "gettimeofday",
+			    strlen("gettimeofday"))) {
 			matches++;
 			continue;
 		}
 
-		if (!memcmp((char*)mapping + delta, "getcpu", strlen("getcpu"))) {
+		if (!memcmp((char *)mapping + delta, "getcpu",
+			    strlen("getcpu"))) {
 			matches++;
 			continue;
 		}
@@ -170,19 +180,22 @@ static int _hvi_hook_vdso(void)
 
 	status = hvi_set_ept_page_protection(g_vdso_physical_address, 1, 0, 1);
 	if (status) {
-		pr_err("hvi_set_ept_page_protection failed with status: %x\n", status);
+		pr_err("hvi_set_ept_page_protection failed with status: %x\n",
+			status);
 		return status;
-	} else {
-		pr_info("successfully hooked first vdso page\n");
 	}
 
-	status = hvi_set_ept_page_protection(g_vdso_physical_address + PAGE_SIZE, 1, 0, 1);
+	pr_info("successfully hooked first vdso page\n");
+
+	status = hvi_set_ept_page_protection(g_vdso_physical_address +
+					     PAGE_SIZE, 1, 0, 1);
 	if (status) {
-		pr_err("hvi_set_ept_page_protection failed with status: %x\n", status);
+		pr_err("hvi_set_ept_page_protection failed with status: %x\n",
+			status);
 		return status;
-	} else {
-		pr_info("Successfully hooked second vdso page\n");
 	}
+
+	pr_info("Successfully hooked second vdso page\n");
 
 	return STATUS_SUCCESS;
 }
@@ -193,21 +206,25 @@ int disable_vdso_protection(void)
 
 	if (g_vdso_physical_address != 0) {
 		pr_info("Will unhook %llx\n", g_vdso_physical_address);
-		status = hvi_set_ept_page_protection(g_vdso_physical_address, 1, 1, 1);
+		status = hvi_set_ept_page_protection(g_vdso_physical_address,
+						     1, 1, 1);
 		if (status) {
-			pr_err("hvi_set_ept_page_protection failed with status: %x\n", status);
+			pr_err("hvi_set_ept_page_protection failed with status: %x\n",
+				status);
 			return status;
-		} else {
-			pr_info("Sucessfully unhooked first vdso page\n");
 		}
 
-		status = hvi_set_ept_page_protection(g_vdso_physical_address + PAGE_SIZE, 1, 1, 1);
+		pr_info("Sucessfully unhooked first vdso page\n");
+
+		status = hvi_set_ept_page_protection(g_vdso_physical_address +
+						     PAGE_SIZE, 1, 1, 1);
 		if (status) {
-			pr_err("hvi_set_ept_page_protection failed with status: %x\n", status);
+			pr_err("hvi_set_ept_page_protection failed with status: %x\n",
+				status);
 			return status;
-		} else {
-			pr_info("Sucessfully unhooked second vdso page\n");
 		}
+
+		pr_info("Sucessfully unhooked second vdso page\n");
 	}
 
 	return STATUS_SUCCESS;
@@ -216,13 +233,17 @@ int disable_vdso_protection(void)
 static inline unsigned long __cr3_read(void)
 {
 	unsigned long long cr3;
-	asm volatile("mov %%cr3, %%rax; mov %%rax, %0;" :"=m" (cr3) :: "%rax");
+
+	asm volatile("mov %%cr3, %%rax; mov %%rax, %0;"
+			: "=m" (cr3)
+			:
+			: "%rax");
 	return cr3;
 }
 
 int enable_vdso_protection(void)
 {
-	void* mapping;
+	void *mapping;
 	struct va_translation tr;
 	int status;
 	unsigned long long delta;
@@ -232,7 +253,8 @@ int enable_vdso_protection(void)
 	tr.physical_address = 0;
 
 	for (;;) {
-		status = hvi_translate_va(tr.virtual_address, __cr3_read(), &tr);
+		status = hvi_translate_va(tr.virtual_address, __cr3_read(),
+					  &tr);
 		if (status) {
 			pr_err("hvi_translate_va failed: %x\n", status);
 			return status;
@@ -240,19 +262,26 @@ int enable_vdso_protection(void)
 
 		for (delta = 0; delta < tr.page_size; delta += PAGE_SIZE) {
 			int found = 0;
-			status = hvi_physmem_map_to_host(tr.physical_address + delta, PAGE_SIZE, 0, &mapping);
+
+			status = hvi_physmem_map_to_host(tr.physical_address +
+							 delta, PAGE_SIZE, 0,
+							 &mapping);
 			if (status) {
-				pr_err("hvi_physmem_map_to_host failed: %x\n", status);
+				pr_err("hvi_physmem_map_to_host failed: %x\n",
+					status);
 				return status;
 			}
 
 			found = _hvi_match_vdso(mapping);
 
-			status = hvi_physmem_unmap((void**)&mapping);
+			status = hvi_physmem_unmap((void **)&mapping);
 
 			if (found) {
-				g_vdso_physical_address = tr.physical_address + delta;
-				pr_info("Found vdso at %llx %llx\n", tr.virtual_address + delta, tr.physical_address + delta);
+				g_vdso_physical_address = tr.physical_address +
+							  delta;
+				pr_info("Found vdso at %llx %llx\n",
+					tr.virtual_address + delta,
+					tr.physical_address + delta);
 				goto _hook_vdso;
 			}
 		}

@@ -1,10 +1,12 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 #include "hvi.h" /* Include this first for pr_fmt. */
 
 #include <linux/module.h>
 #include <asm/processor-flags.h>
 #include <linux/sched.h>
 #include <linux/kprobes.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 #include <linux/slab.h>
 
 #include "hypervisor_introspection.h"
@@ -14,18 +16,14 @@
 #define TOSTRING(x)				STRINGIFY(x)
 #define KVI_LOAD_INTROSPECTION_HYPERCALL	41
 
-extern unsigned long long g_vdso_physical_address;
-extern int enable_vdso_protection(void);
-extern int disable_vdso_protection(void);
-extern void asm_make_vmcall(unsigned int hypercall_id, void *params);
-
-static int dfo_entry_handler(struct kretprobe_instance *ri, struct pt_regs *regs);
+static int dfo_entry_handler(struct kretprobe_instance *ri,
+			     struct pt_regs *regs);
 static int dfo_ret_handler(struct kretprobe_instance *ri, struct pt_regs *regs);
 static int loader(void);
 static int unloader(void);
 
-static int hvi_loaded = 0;
-static int should_unload = 0;
+static int hvi_loaded;
+static int should_unload;
 
 static struct kretprobe dfo_kretprobe = {
 	.handler = dfo_ret_handler,
@@ -41,7 +39,8 @@ struct open_flags_c {
 	int lookup_flags;
 };
 
-static int dfo_entry_handler(struct kretprobe_instance *ri, struct pt_regs *regs)
+static int dfo_entry_handler(struct kretprobe_instance *ri,
+			     struct pt_regs *regs)
 {
 	struct filename *filename = (struct filename *)regs->si;
 	struct open_flags_c *op = (struct open_flags_c *)regs->dx;
@@ -61,11 +60,17 @@ static int dfo_ret_handler(struct kretprobe_instance *ri, struct pt_regs *regs)
 {
 	struct file *retval = (struct file *)regs->ax;
 	unsigned int flags;
+	const char *fname;
 
-	if (unlikely(IS_ERR(retval) || retval->f_path.dentry->d_name.name == NULL))
+	if (unlikely(IS_ERR(retval) || unlikely(IS_ERR(retval->f_path.dentry))))
 		return 1; /* Skip. */
 
-	if (likely(strcmp(retval->f_path.dentry->d_name.name, "docker-runc") != 0))
+	fname = retval->f_path.dentry->d_name.name;
+
+	if (unlikely(fname == NULL))
+		return 1; /* Skip. */
+
+	if (likely(strcmp(fname, "docker-runc") != 0))
 		return 1; /* Skip files other than `docker-runc'. */
 
 	/*
@@ -83,14 +88,16 @@ static int dfo_ret_handler(struct kretprobe_instance *ri, struct pt_regs *regs)
 }
 
 /* XXX: vbh doesn't check the error code returned by this function. */
-int cr4_write_callback(hv_event_e type, unsigned char *data, int size, int *allow)
+int cr4_write_callback(hv_event_e type, unsigned char *data, int size,
+		       int *allow)
 {
 	struct hvi_event_cr *cr_event;
 
 	*allow = 1; /* Allow the action if an error occurs. */
 
 	if (type != cr_write) {
-		pr_err("Invalid event type sent: %d instead of %d\n", type, cr_write);
+		pr_err("Invalid event type sent: %d instead of %d\n",
+			type, cr_write);
 		return -EINVAL;
 	}
 
@@ -101,17 +108,21 @@ int cr4_write_callback(hv_event_e type, unsigned char *data, int size, int *allo
 
 	cr_event = (struct hvi_event_cr *)data;
 	if (cr_event->cr != CPU_REG_CR4) {
-		pr_err("Invalid CR register. Expected CR4, got CR%d\n", cr_event->cr);
+		pr_err("Invalid CR register. Expected CR4, got CR%d\n",
+			cr_event->cr);
 		return -EINVAL;
 	}
 
 	if (((X86_CR4_SMAP & cr_event->old_value) &&
-			!(X86_CR4_SMAP & cr_event->new_value)) ||
-			((X86_CR4_SMEP & cr_event->old_value) &&
-			 !(X86_CR4_SMEP & cr_event->new_value))) {
+		    !(X86_CR4_SMAP & cr_event->new_value)) ||
+		   ((X86_CR4_SMEP & cr_event->old_value) &&
+		    !(X86_CR4_SMEP & cr_event->new_value))) {
 		*allow = 0;
-		/* The kernel is likely going to crash immediately after this. */
-		pr_warn("Malicious activity detected. Process `%s' tried to disable SMAP/SMEP. Will deny!\n", current->comm);
+		/*
+		 * The kernel is likely going to crash immediately after this.
+		 */
+		pr_warn("Malicious activity detected. Process `%s' tried to disable SMAP/SMEP. Will deny!\n",
+			current->comm);
 	}
 
 	return 0;
@@ -134,6 +145,7 @@ int handle_vmcall(hv_event_e type, unsigned char *data, int size, int *allow)
 	if (data != NULL) {
 		/* Deny access if the write flag is set. */
 		int *params = (int *)data;
+
 		if ((*params & O_WRONLY))
 			*params = -EACCES;
 		return 0;
@@ -149,12 +161,14 @@ int handle_vmcall(hv_event_e type, unsigned char *data, int size, int *allow)
 	return 0;
 }
 
-int handle_ept_violation(hv_event_e type, unsigned char* data, int size, int *allow)
+int handle_ept_violation(hv_event_e type, unsigned char *data, int size,
+			 int *allow)
 {
 	struct hvi_event_ept_violation *ept_violation_event;
 
 	if (type != ept_violation) {
-		pr_err("Invalid event type sent to ept_violation handler: %d\n", type);
+		pr_err("Invalid event type sent to ept_violation handler: %d\n",
+			type);
 		return 0;
 	}
 
@@ -163,11 +177,14 @@ int handle_ept_violation(hv_event_e type, unsigned char* data, int size, int *al
 		return 0;
 	}
 
-	ept_violation_event = (struct hvi_event_ept_violation*)data;
+	ept_violation_event = (struct hvi_event_ept_violation *)data;
 
-	pr_info("ept violation. GPA = 0x%llx  GLA = 0x%llx.\n", ept_violation_event->gla, ept_violation_event->gpa);
+	pr_info("ept violation. GPA = 0x%llx  GLA = 0x%llx.\n",
+		ept_violation_event->gla, ept_violation_event->gpa);
 
-	if (ept_violation_event->gpa >= g_vdso_physical_address && ept_violation_event->gpa < g_vdso_physical_address + 2 * PAGE_SIZE) {
+	if (ept_violation_event->gpa >= g_vdso_physical_address &&
+		    ept_violation_event->gpa < g_vdso_physical_address +
+		    2 * PAGE_SIZE) {
 		pr_warn("Malicious write into vdso. Will deny!\n");
 		*allow = 0;
 	} else {
@@ -188,7 +205,8 @@ int register_cr4_write_callback(void)
 
 	status = hvi_register_event_callback(&cr4_event_callback, 1);
 	if (status)
-		pr_err("hvi_register_event_callback failed for cr4_write_callback. Error: %d\n", status);
+		pr_err("hvi_register_event_callback failed for cr4_write_callback. Error: %d\n",
+			status);
 
 	return status;
 }
@@ -203,7 +221,8 @@ int register_vmcall_callback(void)
 
 	status = hvi_register_event_callback(&vmcall_event_callback, 1);
 	if (status)
-		pr_err("hvi_register_event_callback failed for vmcall_event. Error: %d\n", status);
+		pr_err("hvi_register_event_callback failed for vmcall_event. Error: %d\n",
+			status);
 
 	return status;
 }
@@ -218,21 +237,22 @@ int register_ept_violation_callback(void)
 
 	status = hvi_register_event_callback(&ept_violation_event_callback, 1);
 	if (status)
-		pr_err("hvi_register_event_callback failed for ept_violation_callback. Error: %d\n", status);
+		pr_err("hvi_register_event_callback failed for ept_violation_callback. Error: %d\n",
+			status);
 
 	return status;
 }
 
 int enable_cr4_exits(void)
 {
-	hvi_modify_cr_write_exit(CPU_REG_CR4, ~(unsigned int)0, 1);
+	hvi_modify_cr_write_exit(CPU_REG_CR4, ~0, 1);
 
 	return 0;
 }
 
 int disable_cr4_exits(void)
 {
-	hvi_modify_cr_write_exit(CPU_REG_CR4, ~(unsigned int)0, 0);
+	hvi_modify_cr_write_exit(CPU_REG_CR4, ~0, 0);
 
 	return 0;
 }
@@ -299,7 +319,10 @@ int unloader(void)
 
 	disable_cr4_exits();
 
-	/* We do this here because EPT paging structures are not available in vmx non-root. */
+	/*
+	 * We do this here because EPT paging structures are not available in
+	 * vmx non-root.
+	 */
 	disable_vdso_protection();
 
 	hvi_request_vcpu_resume();
@@ -310,7 +333,8 @@ int unloader(void)
 static int __init hvi_init(void)
 {
 	/*
-	 * XXX: Register the VMCALL handler, then issue a vmcall to enter vmx root.
+	 * XXX: Register the VMCALL handler, then issue a vmcall to enter vmx
+	 * root.
 	 */
 	pr_info("Will register VMCALL callback.\n");
 
