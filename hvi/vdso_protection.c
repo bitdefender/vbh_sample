@@ -47,13 +47,13 @@ struct va_translation
     unsigned long long page_size;
 };
 
-static int hvi_translate_va(unsigned long long va, unsigned long long cr3, struct va_translation *translation) 
+static int hvi_translate_va(unsigned long long va, unsigned long long cr3, struct va_translation *translation)
 {
     int status;
-    
+
     unsigned int pml4i, pdpi, pdi, pti;
     unsigned long long *pml4, *pdp, *pd, *pt;
-    
+
     pml4 = pdp = pd = pt = NULL;
 
     translation->virtual_address = va;
@@ -67,7 +67,7 @@ static int hvi_translate_va(unsigned long long va, unsigned long long cr3, struc
     if (status)
         goto cleanup_and_leave;
 
-    if (!(pml4[pml4i] & PD_P)) 
+    if (!(pml4[pml4i] & PD_P))
     {
         status = STATUS_NO_MORE_MAPPING_STRUCTURES;
         goto cleanup_and_leave;
@@ -77,7 +77,7 @@ static int hvi_translate_va(unsigned long long va, unsigned long long cr3, struc
     if (status)
         goto cleanup_and_leave;
 
-    if (!(pdp[pdpi] & PD_P)) 
+    if (!(pdp[pdpi] & PD_P))
     {
         status = STATUS_NO_MORE_MAPPING_STRUCTURES;
         goto cleanup_and_leave;
@@ -112,7 +112,7 @@ static int hvi_translate_va(unsigned long long va, unsigned long long cr3, struc
     status = hvi_physmem_map_to_host(CLEAN_PHYS_ADDRESS64(pd[pdi]), PAGE_SIZE, 0, (void**)&pt);
     if (status)
         goto cleanup_and_leave;
-    
+
     translation->page_size = PAGE_SIZE;
     translation->physical_address = CLEAN_PHYS_ADDRESS64(pt[pti]);
     status = STATUS_SUCCESS;
@@ -124,7 +124,7 @@ cleanup_and_leave:
 
     if (NULL != pdp)
         hvi_physmem_unmap((void**)&pdp);
-    
+
     if (NULL != pd)
         hvi_physmem_unmap((void**)&pd);
 
@@ -189,7 +189,7 @@ static int _hvi_hook_vdso(void)
         pr_err("hvi_set_ept_page_protection failed with status: %x\n", status);
         return status;
     }
-    else 
+    else
     {
         pr_info("successfully hooked first vdso page\n");
     }
@@ -201,7 +201,7 @@ static int _hvi_hook_vdso(void)
         pr_err("hvi_set_ept_page_protection failed with status: %x\n", status);
         return status;
     }
-    else 
+    else
     {
         pr_info("Successfully hooked second vdso page\n");
     }
@@ -260,7 +260,7 @@ int enable_vdso_protection(void)
 
     tr.virtual_address = LINUX_KERNEL_START;
     tr.page_size = PAGE_SIZE;
-    tr.physical_address = 0; 
+    tr.physical_address = 0;
 
     for (;;)
     {
@@ -300,7 +300,7 @@ int enable_vdso_protection(void)
     return status;
 
 _hook_vdso:
-    
+
     pr_info("Hooking vdso...\n");
     status =  _hvi_hook_vdso();
     if (status)
