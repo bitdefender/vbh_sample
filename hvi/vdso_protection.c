@@ -132,7 +132,7 @@ static int _hvi_match_vdso(void* mapping)
 	unsigned int delta;
 	int matches;
 
-	if (*(unsigned int*)mapping != 0x464c457f) // .ELF
+	if (*(unsigned int*)mapping != 0x464c457f) /* .ELF */
 		return 0;
 
 	matches = 0;

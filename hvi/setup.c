@@ -241,8 +241,7 @@ int register_do_filp_open_kretprobe(void)
 {
 	int status;
 
-	// register a kprobe on do_filp_open so we could
-	// filter file access
+	/* Register a kprobe on do_filp_open so we can filter file access. */
 	status = register_kretprobe(&dfo_kretprobe);
 	if (status < 0) {
 		pr_err("register_kretprobe failed, returned %d\n", status);
@@ -299,7 +298,9 @@ int unloader(void)
 	hvi_request_vcpu_pause(0);
 
 	disable_cr4_exits();
-	disable_vdso_protection(); // We do this here because EPT paging structures are not available in vmx non-root.
+
+	/* We do this here because EPT paging structures are not available in vmx non-root. */
+	disable_vdso_protection();
 
 	hvi_request_vcpu_resume();
 
@@ -308,9 +309,9 @@ int unloader(void)
 
 static int __init hvi_init(void)
 {
-	// little big hack ingoming
-	// register the VMCALL handler, then issue a vmcall to enter vmx root
-
+	/*
+	 * XXX: Register the VMCALL handler, then issue a vmcall to enter vmx root.
+	 */
 	pr_info("Will register VMCALL callback.\n");
 
 	if (register_vmcall_callback()) {
