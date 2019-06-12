@@ -117,11 +117,12 @@ int cr4_write_callback(hv_event_e type, unsigned char *data, int size, int *allo
 	return 0;
 }
 
-int handle_vmcall(hv_event_e type, unsigned char* data, int size, int *allow)
+/* XXX: vbh doesn't check the error code returned by this function. */
+int handle_vmcall(hv_event_e type, unsigned char *data, int size, int *allow)
 {
 	if (type != vmcall) {
 		pr_err("Invalid event type sent to vmcall handler: %d\n", type);
-		return 0;
+		return -EINVAL;
 	}
 
 	if (!hvi_loaded) {
@@ -129,9 +130,9 @@ int handle_vmcall(hv_event_e type, unsigned char* data, int size, int *allow)
 		return loader();
 	}
 
-	// for CVE-2019-5736
-	if (NULL != data) {
-		// deny access if the write flag is set
+	/* For CVE-2019-5736 (docker-runc). */
+	if (data != NULL) {
+		/* Deny access if the write flag is set. */
 		int *params = (int *)data;
 		if ((*params & O_WRONLY))
 			*params = -EACCES;
@@ -144,6 +145,7 @@ int handle_vmcall(hv_event_e type, unsigned char* data, int size, int *allow)
 	}
 
 	pr_err("Unhandled vmcall!\n");
+
 	return 0;
 }
 
