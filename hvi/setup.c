@@ -59,21 +59,25 @@ static int dfo_entry_handler(struct kretprobe_instance *ri, struct pt_regs *regs
 static int dfo_ret_handler(struct kretprobe_instance *ri, struct pt_regs *regs)
 {
 	struct file *retval = (struct file *)regs->ax;
+	unsigned int flags;
 
-	if (likely(!IS_ERR(retval))) {
-		if (likely(NULL != retval->f_path.dentry->d_name.name)) {
-			// if the opened file is docker-runc
-			// we make a vmcall with the opening flags
-			if (unlikely(!strcmp(retval->f_path.dentry->d_name.name, "docker-runc"))) {
-				int flags = (u64)retval->f_flags;
-				asm_make_vmcall(DFO_HYPERCALL, (void *)&flags);
-				if (flags == -EACCES) {
-					pr_err("There was an attempt to overwrite docker-runc\n");
-					regs->ax = -EACCES;
-				}
-			}
-		}
+	if (unlikely(IS_ERR(retval) || retval->f_path.dentry->d_name.name == NULL))
+		return 1; /* Skip. */
+
+	if (likely(strcmp(retval->f_path.dentry->d_name.name, "docker-runc") != 0))
+		return 1; /* Skip files other than `docker-runc'. */
+
+	/*
+	 * Make a VMCALL with the opening flags if the file is docker-runc.
+	 */
+	flags = retval->f_flags;
+	asm_make_vmcall(DFO_HYPERCALL, &flags);
+
+	if (flags == -EACCES) {
+		pr_err("There was an attempt to overwrite docker-runc\n");
+		regs->ax = -EACCES;
 	}
+
 	return 0;
 }
 
