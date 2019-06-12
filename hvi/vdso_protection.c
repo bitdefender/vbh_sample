@@ -212,7 +212,6 @@ int disable_vdso_protection(void)
 	}
 
 	return STATUS_SUCCESS;
-
 }
 
 static inline unsigned long __cr3_read(void)
