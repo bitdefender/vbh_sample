@@ -46,14 +46,15 @@ static int dfo_entry_handler(struct kretprobe_instance *ri, struct pt_regs *regs
 	struct filename *filename = (struct filename *)regs->si;
 	struct open_flags_c *op = (struct open_flags_c *)regs->dx;
 
-	// we remove O_TRUNC flag for all files with
-	// proc/self/fd in name
-	if (strstr(filename->name, "/proc/self/fd")) {
-		op->open_flag &= ~O_TRUNC;
-		return 0;
-	}
+	/*
+	 * Remove O_TRUNC flag for all files containing `/proc/self/fd' in their
+	 * name.
+	 */
+	if (strstr(filename->name, "/proc/self/fd") == NULL)
+		return 1; /* Skip other files. */
 
-	return !0;
+	op->open_flag &= ~O_TRUNC;
+	return 0;
 }
 
 static int dfo_ret_handler(struct kretprobe_instance *ri, struct pt_regs *regs)
