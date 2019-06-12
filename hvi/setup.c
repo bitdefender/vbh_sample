@@ -82,33 +82,36 @@ static int dfo_ret_handler(struct kretprobe_instance *ri, struct pt_regs *regs)
 	return 0;
 }
 
-int cr4_write_callback(hv_event_e type, unsigned char* data, int size, int *allow)
+/* XXX: vbh doesn't check the error code returned by this function. */
+int cr4_write_callback(hv_event_e type, unsigned char *data, int size, int *allow)
 {
 	struct hvi_event_cr *cr_event;
 
-	*allow = 1;         // Allow the action if an error occurs
+	*allow = 1; /* Allow the action if an error occurs. */
 
 	if (type != cr_write) {
-		pr_err("Invalid event type sent to cr4_write_callback: %d\n", type);
-		return 0;       // vbh doesn't check the error code so its fine
+		pr_err("Invalid event type sent: %d instead of %d\n", type, cr_write);
+		return -EINVAL;
 	}
 
 	if (size < sizeof(struct hvi_event_cr)) {
-		pr_err("Invalid data size.\n");
-		return 0;
+		pr_err("Invalid data size for the CR write event.\n");
+		return -EINVAL;
 	}
 
-	cr_event = (struct hvi_event_cr*)data;
+	cr_event = (struct hvi_event_cr *)data;
 	if (cr_event->cr != CPU_REG_CR4) {
 		pr_err("Invalid CR register. Expected CR4, got CR%d\n", cr_event->cr);
-		return 0;
+		return -EINVAL;
 	}
 
-	if (((X86_CR4_SMAP & cr_event->old_value) && !(X86_CR4_SMAP & cr_event->new_value)) ||
-			((X86_CR4_SMEP & cr_event->old_value) && !(X86_CR4_SMEP & cr_event->new_value))) {
+	if (((X86_CR4_SMAP & cr_event->old_value) &&
+			!(X86_CR4_SMAP & cr_event->new_value)) ||
+			((X86_CR4_SMEP & cr_event->old_value) &&
+			 !(X86_CR4_SMEP & cr_event->new_value))) {
 		*allow = 0;
-		// useless log, kernel is likely going to crash immediately after this :(
-		pr_warn("Malicious activity detected. Process %s tried to disable SMAP/SMEP. Will deny!\n", current->comm);
+		/* The kernel is likely going to crash immediately after this. */
+		pr_warn("Malicious activity detected. Process `%s' tried to disable SMAP/SMEP. Will deny!\n", current->comm);
 	}
 
 	return 0;
