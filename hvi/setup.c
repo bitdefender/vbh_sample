@@ -20,6 +20,8 @@ extern int enable_vdso_protection(void);
 extern int disable_vdso_protection(void);
 static int dfo_entry_handler(struct kretprobe_instance *ri, struct pt_regs *regs);
 static int dfo_ret_handler(struct kretprobe_instance *ri, struct pt_regs *regs);
+static int loader(void);
+static int unloader(void);
 
 void asm_make_vmcall(unsigned int hypercall_id, void *params);
 static int hvi_loaded = 0;
@@ -79,10 +81,6 @@ static int dfo_ret_handler(struct kretprobe_instance *ri, struct pt_regs *regs)
     }
     return 0;
 }
-
-
-int loader(void);
-int unloader(void);
 
 int cr4_write_callback(hv_event_e type, unsigned char* data, int size, int *allow)
 {
