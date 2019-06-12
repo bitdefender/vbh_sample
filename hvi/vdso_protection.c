@@ -112,16 +112,16 @@ static int hvi_translate_va(unsigned long long va, unsigned long long cr3, struc
 
 cleanup_and_leave:
 
-	if (NULL != pml4)
+	if (pml4 != NULL)
 		hvi_physmem_unmap((void**)&pml4);
 
-	if (NULL != pdp)
+	if (pdp != NULL)
 		hvi_physmem_unmap((void**)&pdp);
 
-	if (NULL != pd)
+	if (pd != NULL)
 		hvi_physmem_unmap((void**)&pd);
 
-	if (NULL != pt)
+	if (pt != NULL)
 		hvi_physmem_unmap((void**)&pt);
 
 	return status;
@@ -152,18 +152,18 @@ static int _hvi_match_vdso(void* mapping)
 			continue;
 		}
 
-		if (3 == matches)
+		if (matches == 3)
 			break;
 	}
 
-	return (3 == matches);
+	return (matches == 3);
 }
 
 static int _hvi_hook_vdso(void)
 {
 	int status;
 
-	if (0 == g_vdso_physical_address)
+	if (g_vdso_physical_address == 0)
 		return STATUS_INVALID_INTERNAL_STATE;
 
 	pr_info("will hook  %llx\n", g_vdso_physical_address);
@@ -192,7 +192,7 @@ int disable_vdso_protection(void)
 {
 	int status;
 
-	if (0 != g_vdso_physical_address) {
+	if (g_vdso_physical_address != 0) {
 		pr_info("Will unhook  %llx\n", g_vdso_physical_address);
 		status = hvi_set_ept_page_protection(g_vdso_physical_address, 1, 1, 1);
 		if (status) {

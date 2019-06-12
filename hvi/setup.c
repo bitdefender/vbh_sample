@@ -282,7 +282,7 @@ _done_resume_vcpus:
 	if (hvi_request_vcpu_resume())
 		pr_err("Could not resume vcpus!\n");
 
-	if (0 == status)
+	if (status == 0)
 		return status;
 
 _done_unregister_ept_violation_callback:
