@@ -176,7 +176,6 @@ static int _hvi_hook_vdso(void)
 		pr_info("successfully hooked first vdso page\n");
 	}
 
-
 	status = hvi_set_ept_page_protection(g_vdso_physical_address + PAGE_SIZE, 1, 0, 1);
 	if (status) {
 		pr_err("hvi_set_ept_page_protection failed with status: %x\n", status);
