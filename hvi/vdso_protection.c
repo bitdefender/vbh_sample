@@ -166,7 +166,7 @@ static int _hvi_hook_vdso(void)
 	if (g_vdso_physical_address == 0)
 		return STATUS_INVALID_INTERNAL_STATE;
 
-	pr_info("will hook  %llx\n", g_vdso_physical_address);
+	pr_info("will hook %llx\n", g_vdso_physical_address);
 
 	status = hvi_set_ept_page_protection(g_vdso_physical_address, 1, 0, 1);
 	if (status) {
@@ -192,7 +192,7 @@ int disable_vdso_protection(void)
 	int status;
 
 	if (g_vdso_physical_address != 0) {
-		pr_info("Will unhook  %llx\n", g_vdso_physical_address);
+		pr_info("Will unhook %llx\n", g_vdso_physical_address);
 		status = hvi_set_ept_page_protection(g_vdso_physical_address, 1, 1, 1);
 		if (status) {
 			pr_err("hvi_set_ept_page_protection failed with status: %x\n", status);

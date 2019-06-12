@@ -349,4 +349,4 @@ module_exit(hvi_uninit);
 MODULE_LICENSE("GPL");
 MODULE_VERSION("0.1");
 MODULE_AUTHOR("Bogdan-Viorel BOSINTA <bbosinta@bitdefender.com>, "
-              "Alexandru-Ciprian Cihodaru <acihodaru@bitdefender.com>");
+	      "Alexandru-Ciprian Cihodaru <acihodaru@bitdefender.com>");
