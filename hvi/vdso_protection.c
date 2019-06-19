@@ -1,4 +1,5 @@
-#include <linux/printk.h>
+#include "hvi.h" /* Include this first for pr_fmt. */
+
 #include <linux/string.h>
 #include <linux/kallsyms.h>
 #include "hypervisor_introspection.h"
@@ -180,29 +181,29 @@ static int _hvi_hook_vdso(void)
     if (0 == g_vdso_physical_address)
         return STATUS_INVALID_INTERNAL_STATE;
 
-    printk(KERN_ERR "will hook  %llx\n", g_vdso_physical_address);
+    pr_info("will hook  %llx\n", g_vdso_physical_address);
 
     status = hvi_set_ept_page_protection(g_vdso_physical_address, 1, 0, 1);
     if (status)
     {
-        printk(KERN_ERR "[ERROR] hvi_set_ept_page_protection failed with status: %x\n", status);
+        pr_err("hvi_set_ept_page_protection failed with status: %x\n", status);
         return status;
     }
     else 
     {
-        printk(KERN_ERR "[INFO] successfully hooked first vdso page\n");
+        pr_info("successfully hooked first vdso page\n");
     }
 
 
     status = hvi_set_ept_page_protection(g_vdso_physical_address + PAGE_SIZE, 1, 0, 1);
     if (status)
     {
-        printk(KERN_ERR "[ERROR] hvi_set_ept_page_protection failed with status: %x\n", status);
+        pr_err("hvi_set_ept_page_protection failed with status: %x\n", status);
         return status;
     }
     else 
     {
-        printk(KERN_ERR "[INFO] Successfully hooked second vdso page\n");
+        pr_info("Successfully hooked second vdso page\n");
     }
 
     return STATUS_SUCCESS;
@@ -215,27 +216,27 @@ int disable_vdso_protection(void)
 
     if (0 != g_vdso_physical_address)
     {
-        printk(KERN_ERR "[INFO] Will unhook  %llx\n", g_vdso_physical_address);
+        pr_info("Will unhook  %llx\n", g_vdso_physical_address);
         status = hvi_set_ept_page_protection(g_vdso_physical_address, 1, 1, 1);
         if (status)
         {
-            printk(KERN_ERR "[ERROR] hvi_set_ept_page_protection failed with status: %x\n", status);
+            pr_err("hvi_set_ept_page_protection failed with status: %x\n", status);
             return status;
         }
         else
         {
-            printk(KERN_ERR "[INFO] Sucessfully unhooked first vdso page\n");
+            pr_info("Sucessfully unhooked first vdso page\n");
         }
 
         status = hvi_set_ept_page_protection(g_vdso_physical_address + PAGE_SIZE, 1, 1, 1);
         if (status)
         {
-            printk(KERN_ERR "[ERROR] hvi_set_ept_page_protection failed with status: %x\n", status);
+            pr_err("hvi_set_ept_page_protection failed with status: %x\n", status);
             return status;
         }
         else
         {
-            printk(KERN_ERR "[INFO] Sucessfully unhooked second vdso page\n");
+            pr_info("Sucessfully unhooked second vdso page\n");
         }
     }
 
@@ -266,7 +267,7 @@ int enable_vdso_protection(void)
         status = hvi_translate_va(tr.virtual_address, __cr3_read(), &tr);
         if (status)
         {
-            printk(KERN_ERR "[ERROR] hvi_translate_va failed: %x\n", status);
+            pr_err("hvi_translate_va failed: %x\n", status);
             return status;
         }
 
@@ -276,7 +277,7 @@ int enable_vdso_protection(void)
             status = hvi_physmem_map_to_host(tr.physical_address + delta, PAGE_SIZE, 0, &mapping);
             if (status)
             {
-                printk(KERN_ERR "[ERROR] hvi_physmem_map_to_host failed: %x\n", status);
+                pr_err("hvi_physmem_map_to_host failed: %x\n", status);
                 return status;
             }
 
@@ -287,7 +288,7 @@ int enable_vdso_protection(void)
             if (found)
             {
                 g_vdso_physical_address = tr.physical_address + delta;
-                printk(KERN_ERR "[INFO] Found vdso at %llx %llx\n", tr.virtual_address + delta, tr.physical_address + delta);
+                pr_info("Found vdso at %llx %llx\n", tr.virtual_address + delta, tr.physical_address + delta);
                 goto _hook_vdso;
             }
         }
@@ -295,16 +296,16 @@ int enable_vdso_protection(void)
         tr.virtual_address += tr.page_size;
     }
 
-    printk(KERN_ERR "[ERROR] Vdso not found...\n");
+    pr_err("Vdso not found...\n");
     return status;
 
 _hook_vdso:
     
-    printk(KERN_ERR "[INFO] Hooking vdso...\n");
+    pr_info("Hooking vdso...\n");
     status =  _hvi_hook_vdso();
     if (status)
     {
-        printk(KERN_ERR "[ERROR] Failed hooking vdso..\n");
+        pr_err("Failed hooking vdso..\n");
     }
     return status;
 }
